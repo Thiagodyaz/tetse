@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerador de Imagem</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: "Inter", sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #333;
+        }
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            resize: vertical;
+            min-height: 100px;
+            box-sizing: border-box;
+        }
+        .loading-spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+            display: none; /* Hidden by default */
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            margin-top: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+            display: none; /* Hidden by default */
+        }
+        button {
+            background-color: #3b82f6;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            margin-top: 20px;
+        }
+        button:hover {
+            background-color: #2563eb;
+        }
+        /* Custom modal for alerts */
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed; /* Stay in place */
+            z-index: 1; /* Sit on top */
+            left: 0;
+            top: 0;
+            width: 100%; /* Full width */
+            height: 100%; /* Full height */
+            overflow: auto; /* Enable scroll if needed */
+            background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 20px;
+            border: 1px solid #888;
+            border-radius: 10px;
+            width: 80%; /* Could be more responsive */
+            max-width: 400px;
+            text-align: center;
+            position: relative;
+        }
+        .close-button {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            position: absolute;
+            top: 10px;
+            right: 15px;
+        }
+        .close-button:hover,
+        .close-button:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-2xl font-bold text-gray-800 mb-4">Gerador de Imagem com IA</h1>
+        <p class="text-gray-600 mb-6">Escreva o que você deseja gerar na caixa de texto abaixo e clique em "Gerar Imagem".</p>
+
+        <div class="form-group">
+            <label for="imagePrompt">Descrição da Imagem:</label>
+            <textarea id="imagePrompt" placeholder="Ex: Um pacote de lanche de papel em cima de uma mesa em primeiro plano, com o fundo desfocado com pessoas na sala se divertindo."></textarea>
+        </div>
+
+        <button id="generateImageBtn">Gerar Imagem</button>
+        <div id="loadingSpinner" class="loading-spinner"></div>
+        <img id="generatedImage" src="" alt="Imagem Gerada pela IA">
+    </div>
+
+    <!-- Custom Modal for Messages -->
+    <div id="customModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <p id="modalMessage"></p>
+        </div>
+    </div>
+
+    <script>
+        // Function to show custom modal
+        function showCustomModal(message) {
+            const modal = document.getElementById('customModal');
+            const modalMessage = document.getElementById('modalMessage');
+            modalMessage.textContent = message;
+            modal.style.display = 'flex'; // Use flex to center
+        }
+
+        // Function to hide custom modal
+        function hideCustomModal() {
+            const modal = document.getElementById('customModal');
+            modal.style.display = 'none';
+        }
+
+        // Close button event listener
+        document.querySelector('.close-button').addEventListener('click', hideCustomModal);
+
+        // Close modal if clicked outside
+        window.addEventListener('click', (event) => {
+            const modal = document.getElementById('customModal');
+            if (event.target == modal) {
+                hideCustomModal();
+            }
+        });
+
+
+        document.getElementById('generateImageBtn').addEventListener('click', async () => {
+            const loadingSpinner = document.getElementById('loadingSpinner');
+            const generatedImage = document.getElementById('generatedImage');
+            const imagePromptInput = document.getElementById('imagePrompt');
+            const prompt = imagePromptInput.value.trim(); // Get the user's input
+
+            if (!prompt) {
+                showCustomModal('Por favor, digite uma descrição para a imagem.');
+                return; // Stop execution if prompt is empty
+            }
+
+            // Show loading spinner and hide previous image
+            loadingSpinner.style.display = 'block';
+            generatedImage.style.display = 'none';
+            generatedImage.src = ''; // Clear previous image
+
+            try {
+                const payload = { instances: { prompt: prompt }, parameters: { "sampleCount": 1} };
+                const apiKey = ""; // Canvas will automatically provide the API key
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`;
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+
+                if (result.predictions && result.predictions.length > 0 && result.predictions[0].bytesBase64Encoded) {
+                    const imageUrl = `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`;
+                    generatedImage.src = imageUrl;
+                    generatedImage.style.display = 'block'; // Show the generated image
+                } else {
+                    console.error('Erro ao gerar imagem: Estrutura de resposta inesperada ou conteúdo ausente.');
+                    showCustomModal('Não foi possível gerar a imagem. Tente novamente.');
+                }
+            } catch (error) {
+                console.error('Erro na chamada da API:', error);
+                showCustomModal('Ocorreu um erro ao gerar a imagem. Verifique sua conexão ou tente mais tarde.');
+            } finally {
+                loadingSpinner.style.display = 'none'; // Hide loading spinner
+            }
+        });
+    </script>
+</body>
+</html>
